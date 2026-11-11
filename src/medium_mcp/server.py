@@ -4,6 +4,7 @@ Always available (no account needed):
   - get_user_stories, get_publication_stories, get_tag_stories  (public RSS)
   - prepare_article                                              (local checks)
   - export_article                                               (writes paste-ready HTML)
+  - open_in_medium                       (macOS: clipboard + opens new story in browser)
 
 Available only when MEDIUM_INTEGRATION_TOKEN is set (pre-2025 legacy token):
   - get_medium_profile, list_my_publications, upload_image, create_post
@@ -22,7 +23,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import export, feeds
+from . import export, feeds, handoff
 from .formatter import prepare_article as _prepare_article
 from .medium_api import LICENSES, MediumAPIError, MediumClient
 
@@ -39,8 +40,11 @@ Before publishing or pasting anything into Medium, run prepare_article on the
 Markdown and show the user its warnings. Medium has no tables, no nested lists,
 no footnotes and only two heading sizes.
 
-Without a token (the usual case), "publishing" means export_article: it writes an
-HTML file the user opens, copies and pastes into Medium's editor.
+Without a token (the usual case), "publishing" is a hand-off: on macOS use
+open_in_medium, which puts the article on the clipboard and opens a new Medium
+story in the user's browser; they press Cmd+V and publish themselves. Elsewhere,
+use export_article, which writes an HTML page to copy from. Never try to log in
+to Medium or automate the browser.
 
 Publishing tools exist only if the user configured a legacy integration token.
 create_post defaults to publish_status="draft". Never use "public" or "unlisted"
@@ -48,7 +52,7 @@ unless the user explicitly asked for that in this conversation. Medium's API
 cannot edit or delete a post after it is created.
 """
 
-mcp = MCPServer("medium", instructions=INSTRUCTIONS, version="0.1.0")
+mcp = MCPServer("medium", instructions=INSTRUCTIONS, version="0.2.0")
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHint=True)
 LOCAL_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False, idempotentHint=True)
@@ -161,18 +165,8 @@ def export_article(
     headings, bold, links, lists, quotes, images and code blocks. Tell the user the
     output path and pass on the warnings.
     """
-    if bool(file_path) == bool(markdown):
-        raise ToolError("Pass exactly one of `file_path` or `markdown`.")
-
-    if file_path:
-        src = Path(file_path).expanduser().resolve()
-        try:
-            markdown = src.read_text(encoding="utf-8")
-        except OSError as e:
-            raise ToolError(f"Couldn't read {src}: {e.strerror or e}") from e
-        default_out = src.with_name(src.stem + ".medium.html")
-    else:
-        default_out = Path.cwd() / "medium-export.html"
+    markdown, src = _load_markdown(file_path, markdown)
+    default_out = src.with_name(src.stem + ".medium.html") if src else Path.cwd() / "medium-export.html"
 
     out = Path(output_path).expanduser().resolve() if output_path else default_out
     if out.suffix.lower() not in {".html", ".htm"}:
@@ -188,9 +182,71 @@ def export_article(
 
     return {
         "html_path": str(out),
+        **_metadata(prepared),
         "open_command": f'open "{out}"',
         "next_steps": "Open the file, click in the article, Cmd+A, Cmd+C, then paste into "
-                      "https://medium.com/new-story. Add tags/subtitle in Medium's publish dialog.",
+                      "https://medium.com/new-story. Add tags/subtitle in Medium's publish dialog. "
+                      "Or use open_in_medium to skip the copy step.",
+    }
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False))
+def open_in_medium(
+    file_path: Annotated[
+        str | None, Field(description="Path to the article's .md file. Use this or `markdown`.")
+    ] = None,
+    markdown: Annotated[str | None, Field(description="Article Markdown, if there is no file.")] = None,
+    browser: Annotated[
+        str | None,
+        Field(description="macOS app to open, e.g. 'Safari' or 'Google Chrome', or 'default'. "
+                          "Defaults to $MEDIUM_BROWSER, else Safari."),
+    ] = None,
+    title: Annotated[str | None, Field(description="Story title. Defaults to the first '# ' heading.")] = None,
+    subtitle: Annotated[str | None, Field(description="One-line subtitle shown under the title.")] = None,
+    tags: Annotated[list[str] | None, Field(description="Up to 5 tags (entered in Medium's publish dialog).")] = None,
+    canonical_url: Annotated[str | None, Field(description="Original URL if cross-posting.")] = None,
+) -> dict:
+    """Copy the article to the clipboard as formatted text and open a new Medium story (macOS).
+
+    No login or browser automation: it opens medium.com/new-story in the user's normal
+    browser, where they're already signed in, and they press Cmd+V. Replaces whatever
+    is on the clipboard. Show the user the warnings, and the tags/subtitle to enter
+    in Medium's publish dialog. Nothing is published.
+    """
+    markdown, _src = _load_markdown(file_path, markdown)
+    prepared = _prepare_article(markdown, title, subtitle, tags, canonical_url)
+    app = handoff.resolve_browser(browser)
+    try:
+        handoff.copy_rich_text(export.markdown_to_html(prepared.content_markdown), prepared.content_markdown)
+        handoff.open_url(handoff.NEW_STORY_URL, app)
+    except handoff.HandoffError as e:
+        raise ToolError(str(e)) from e
+
+    return {
+        "opened": handoff.NEW_STORY_URL,
+        "browser": app or "system default",
+        **_metadata(prepared),
+        "next_steps": "In the new story, click the title line and press Cmd+V. Review it, then click "
+                      "Publish and add the tags/subtitle in the publish dialog. If you aren't signed in, "
+                      "sign in first; the article stays on the clipboard.",
+    }
+
+
+def _load_markdown(file_path: str | None, markdown: str | None) -> tuple[str, Path | None]:
+    if bool(file_path) == bool(markdown):
+        raise ToolError("Pass exactly one of `file_path` or `markdown`.")
+    if not file_path:
+        return markdown, None
+    src = Path(file_path).expanduser().resolve()
+    try:
+        return src.read_text(encoding="utf-8"), src
+    except OSError as e:
+        raise ToolError(f"Couldn't read {src}: {e.strerror or e}") from e
+
+
+def _metadata(prepared) -> dict:
+    return {
+        "title": prepared.title,
         "title": prepared.title,
         "subtitle": prepared.subtitle,
         "tags": prepared.tags,
@@ -285,8 +341,8 @@ def draft_from_code(topic: str = "the changes on the current branch") -> str:
 4. Suggest a subtitle and up to 5 tags.
 5. Run prepare_article on the draft, fix anything it warns about, and save the
    result as a .md file in the project.
-6. Run export_article on that file and tell me the .html path so I can paste
-   it into Medium. Don't publish anything."""
+6. Ask me whether to open it in Medium. If I say yes, run open_in_medium on
+   that file and tell me the subtitle and tags to enter. Don't publish anything."""
 
 
 def main() -> None:

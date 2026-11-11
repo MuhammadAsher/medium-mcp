@@ -10,10 +10,18 @@ and any other MCP client.
 2. **Draft**: `/mcp__medium__draft_from_code <topic>` writes an article from code in your project.
 3. **Prepare**: `prepare_article` fixes what Medium can't display (tables, deep headings, checklists)
    and warns about the rest.
-4. **Export**: `export_article` writes `<post>.medium.html`. Open it, click in the article,
-   press Cmd+A, Cmd+C, and paste into [medium.com/new-story](https://medium.com/new-story).
+4. **Open in Medium** (macOS): `open_in_medium` copies the article to your clipboard as
+   formatted text and opens [medium.com/new-story](https://medium.com/new-story) in Safari,
+   where you're already signed in. Click the title line, press Cmd+V, review, and publish.
    Medium keeps headings, bold, links, lists, quotes, images and code blocks.
    Add tags and subtitle in Medium's publish dialog.
+
+   Not on macOS? `export_article` writes `<post>.medium.html` instead: open it,
+   click in the article, Cmd+A, Cmd+C, and paste into Medium.
+
+There's no Medium login in this server, on purpose. Medium no longer gives new apps
+API access, and its site blocks automated browsers, so the server hands the article
+to your normal browser and you do the final paste.
 
 ## Tools
 
@@ -24,6 +32,7 @@ and any other MCP client.
 | `get_tag_stories` | Latest stories under a tag (Medium only includes an excerpt here) |
 | `prepare_article` | Checks Markdown against what Medium supports, fixes what it can, returns warnings, word count and reading time |
 | `export_article` | Runs `prepare_article`, then writes a paste-ready HTML page |
+| `open_in_medium` | macOS: runs `prepare_article`, copies the result as rich text, opens a new Medium story. Replaces your clipboard |
 
 Plus one prompt, `draft_from_code`, which shows up as a slash command in Claude Code.
 
@@ -41,7 +50,7 @@ cd medium-mcp
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest            # 36 tests, all offline
+pytest            # 43 tests, all offline
 ```
 
 ## Connect it to Claude Code (VS Code extension or terminal)
@@ -68,13 +77,23 @@ claude mcp add --scope user medium -- /Users/YOU/path/to/medium-mcp/.venv/bin/me
 Start a new Claude Code session, approve the server when asked, and type `/mcp`
 to confirm `medium` is connected.
 
+### Choosing the browser
+
+`open_in_medium` uses Safari unless told otherwise. Pass `browser` per call, or set
+a default with an environment variable (any app name from /Applications, or `default`
+for your system browser):
+
+```bash
+claude mcp add --scope user medium -e MEDIUM_BROWSER="Google Chrome" -- /Users/YOU/path/to/medium-mcp/.venv/bin/medium-mcp
+```
+
 ## Try it
 
 - "What has @username published on Medium lately?"
 - "What's being written under the fastapi tag this week? Summarize the angles."
 - "/mcp__medium__draft_from_code the caching layer in src/cache"
 - "Run prepare_article on docs/post.md and fix the warnings."
-- "Export docs/post.md for Medium."
+- "Open docs/post.md in Medium."
 
 ## Project layout
 
@@ -84,6 +103,7 @@ src/medium_mcp/
   feeds.py       RSS fetch/parse, HTML -> Markdown (stdlib only)
   formatter.py   Medium compatibility checks and rewrites
   export.py      Markdown -> paste-ready HTML
+  handoff.py     macOS clipboard + open browser (osascript, open)
   _http.py       HTTPS using the OS trust store
   medium_api.py  Legacy REST client (token only)
 tests/           Offline tests with a fixture feed
