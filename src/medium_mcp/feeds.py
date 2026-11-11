@@ -13,6 +13,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 
+from . import _http
+
 FEED_BASE = "https://medium.com/feed"
 USER_AGENT = "medium-mcp/0.1 (+https://github.com/modelcontextprotocol)"
 TIMEOUT_SECONDS = 15
@@ -86,7 +88,7 @@ def tag_feed_url(tag: str) -> str:
 def fetch(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+        with _http.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
             return resp.read()
     except urllib.error.HTTPError as e:
         if e.code == 404:

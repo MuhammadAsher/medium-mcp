@@ -3,6 +3,7 @@
 Always available (no account needed):
   - get_user_stories, get_publication_stories, get_tag_stories  (public RSS)
   - prepare_article                                              (local checks)
+  - export_article                                               (writes paste-ready HTML)
 
 Available only when MEDIUM_INTEGRATION_TOKEN is set (pre-2025 legacy token):
   - get_medium_profile, list_my_publications, upload_image, create_post
@@ -13,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+from pathlib import Path
 from typing import Annotated, Literal
 
 from mcp.server.mcpserver import MCPServer
@@ -20,7 +22,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import feeds
+from . import export, feeds
 from .formatter import prepare_article as _prepare_article
 from .medium_api import LICENSES, MediumAPIError, MediumClient
 
@@ -36,6 +38,9 @@ full text (it is much longer).
 Before publishing or pasting anything into Medium, run prepare_article on the
 Markdown and show the user its warnings. Medium has no tables, no nested lists,
 no footnotes and only two heading sizes.
+
+Without a token (the usual case), "publishing" means export_article: it writes an
+HTML file the user opens, copies and pastes into Medium's editor.
 
 Publishing tools exist only if the user configured a legacy integration token.
 create_post defaults to publish_status="draft". Never use "public" or "unlisted"
@@ -133,6 +138,70 @@ def prepare_article(
     return _prepare_article(markdown, title, subtitle, tags, canonical_url).to_dict()
 
 
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False))
+def export_article(
+    file_path: Annotated[
+        str | None, Field(description="Path to the article's .md file. Use this or `markdown`.")
+    ] = None,
+    markdown: Annotated[str | None, Field(description="Article Markdown, if there is no file.")] = None,
+    output_path: Annotated[
+        str | None,
+        Field(description="Where to write the .html. Defaults to <file>.medium.html next to the input, "
+                          "or ./medium-export.html."),
+    ] = None,
+    title: Annotated[str | None, Field(description="Story title. Defaults to the first '# ' heading.")] = None,
+    subtitle: Annotated[str | None, Field(description="One-line subtitle shown under the title.")] = None,
+    tags: Annotated[list[str] | None, Field(description="Up to 5 tags (entered in Medium's publish dialog).")] = None,
+    canonical_url: Annotated[str | None, Field(description="Original URL if cross-posting.")] = None,
+) -> dict:
+    """Write the article as an HTML page to copy-paste into Medium's editor (no token needed).
+
+    Runs prepare_article first, then converts to HTML. The user opens the file in a
+    browser, selects all, copies, and pastes into medium.com/new-story; Medium keeps
+    headings, bold, links, lists, quotes, images and code blocks. Tell the user the
+    output path and pass on the warnings.
+    """
+    if bool(file_path) == bool(markdown):
+        raise ToolError("Pass exactly one of `file_path` or `markdown`.")
+
+    if file_path:
+        src = Path(file_path).expanduser().resolve()
+        try:
+            markdown = src.read_text(encoding="utf-8")
+        except OSError as e:
+            raise ToolError(f"Couldn't read {src}: {e.strerror or e}") from e
+        default_out = src.with_name(src.stem + ".medium.html")
+    else:
+        default_out = Path.cwd() / "medium-export.html"
+
+    out = Path(output_path).expanduser().resolve() if output_path else default_out
+    if out.suffix.lower() not in {".html", ".htm"}:
+        raise ToolError("output_path must end in .html")
+
+    prepared = _prepare_article(markdown, title, subtitle, tags, canonical_url)
+    page = export.render_page(prepared.title, export.markdown_to_html(prepared.content_markdown))
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(page, encoding="utf-8")
+    except OSError as e:
+        raise ToolError(f"Couldn't write {out}: {e.strerror or e}") from e
+
+    return {
+        "html_path": str(out),
+        "open_command": f'open "{out}"',
+        "next_steps": "Open the file, click in the article, Cmd+A, Cmd+C, then paste into "
+                      "https://medium.com/new-story. Add tags/subtitle in Medium's publish dialog.",
+        "title": prepared.title,
+        "subtitle": prepared.subtitle,
+        "tags": prepared.tags,
+        "canonical_url": prepared.canonical_url,
+        "word_count": prepared.word_count,
+        "reading_minutes": prepared.reading_minutes,
+        "warnings": prepared.warnings,
+        "changes": prepared.changes,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Publishing (legacy token only)
 # --------------------------------------------------------------------------- #
@@ -215,7 +284,9 @@ def draft_from_code(topic: str = "the changes on the current branch") -> str:
 3. Use only '#' for the title and '##' for sections. No tables, nested lists or footnotes.
 4. Suggest a subtitle and up to 5 tags.
 5. Run prepare_article on the draft, fix anything it warns about, and save the
-   result as a .md file in the project. Don't publish anything."""
+   result as a .md file in the project.
+6. Run export_article on that file and tell me the .html path so I can paste
+   it into Medium. Don't publish anything."""
 
 
 def main() -> None:

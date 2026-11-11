@@ -16,6 +16,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from . import _http
+
 API_BASE = "https://api.medium.com/v1"
 TIMEOUT_SECONDS = 30
 PUBLISH_STATUSES = ("draft", "unlisted", "public")
@@ -58,7 +60,7 @@ class MediumClient:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+            with _http.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
                 payload = json.loads(resp.read() or b"{}")
         except urllib.error.HTTPError as e:
             detail = ""

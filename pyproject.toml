@@ -5,7 +5,7 @@ description = "MCP server for reading Medium feeds and preparing/publishing Medi
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-dependencies = ["mcp>=2.3,<3"]
+dependencies = ["mcp>=2.3,<3", "truststore>=0.9"]
 
 [project.scripts]
 medium-mcp = "medium_mcp.server:main"
