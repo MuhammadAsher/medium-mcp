@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0" xmlns:cc="http://cyber.law.harvard.edu/rss/creativeCommonsRssModule.html">
+  <channel>
+    <title><![CDATA[Stories by Sample Writer on Medium]]></title>
+    <link>https://medium.com/@samplewriter?source=rss-abc123------2</link>
+    <item>
+      <title><![CDATA[Caching API Responses in FastAPI Without Losing Your Mind]]></title>
+      <link>https://medium.com/@samplewriter/caching-api-responses-1a2b3c4d5e6f?source=rss-abc123------2</link>
+      <guid isPermaLink="false">https://medium.com/p/1a2b3c4d5e6f</guid>
+      <category><![CDATA[python]]></category>
+      <category><![CDATA[fastapi]]></category>
+      <category><![CDATA[caching]]></category>
+      <dc:creator><![CDATA[Sample Writer]]></dc:creator>
+      <pubDate>Mon, 09 Nov 2026 10:15:00 GMT</pubDate>
+      <atom:updated>2026-11-09T10:15:00.000Z</atom:updated>
+      <content:encoded><![CDATA[<h3>The problem</h3><p>Our endpoint took <strong>800ms</strong> on every call &amp; users noticed.</p><figure><img alt="" src="https://cdn-images-1.medium.com/max/1024/chart.png" /></figure><pre>from functools import lru_cache<br><br>@lru_cache<br>def get_config():<br>    return load()</pre><ul><li>Cache reads</li><li>Invalidate on write</li></ul><p>See <a href="https://example.com/docs">the docs</a>.</p><img src="https://medium.com/_/stat?event=post.clientViewed&amp;referrerSource=full_rss&amp;postId=1a2b3c4d5e6f" width="1" height="1" alt="">]]></content:encoded>
+    </item>
+    <item>
+      <title><![CDATA[Second Story]]></title>
+      <link>https://medium.com/@samplewriter/second-story-ffff?source=rss-abc123------2</link>
+      <dc:creator><![CDATA[Sample Writer]]></dc:creator>
+      <pubDate>Fri, 06 Nov 2026 08:00:00 GMT</pubDate>
+      <content:encoded><![CDATA[<p>Short one.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>
