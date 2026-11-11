@@ -1,4 +1,7 @@
-# medium-mcp
+# medium-writer-mcp
+
+[![CI](https://github.com/MuhammadAsher/medium-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/MuhammadAsher/medium-mcp/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/medium-writer-mcp)](https://pypi.org/project/medium-writer-mcp/)
 
 An MCP server that lets Claude read Medium and get your articles Medium-ready.
 Works in Claude Code (terminal or the VS Code extension), the Claude desktop app,
@@ -41,41 +44,28 @@ Plus one prompt, `draft_from_code`, which shows up as a slash command in Claude 
 - Medium has no public way to post without an API token, and stopped issuing
   tokens in January 2025, hence the copy-paste step.
 
-## Install (macOS)
+## Install
 
-Requires Python 3.10+.
+Add it to Claude Code for all your projects (needs [uv](https://docs.astral.sh/uv/)):
 
 ```bash
-cd medium-mcp
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest            # 43 tests, all offline
+claude mcp add --scope user medium -- uvx medium-writer-mcp
 ```
 
-## Connect it to Claude Code (VS Code extension or terminal)
+Start a new Claude Code session and type `/mcp` to confirm `medium` is connected.
+It works the same in the VS Code extension and the terminal.
 
-Both read the same config. Easiest: add a `.mcp.json` to the root of the project
-you'll write articles from (use the full path to your venv):
+For the Claude desktop app or another MCP client, add this to its config:
 
 ```json
 {
   "mcpServers": {
-    "medium": {
-      "command": "/Users/YOU/path/to/medium-mcp/.venv/bin/medium-mcp"
-    }
+    "medium": { "command": "uvx", "args": ["medium-writer-mcp"] }
   }
 }
 ```
 
-Or, if you have the `claude` CLI installed, register it for all projects:
-
-```bash
-claude mcp add --scope user medium -- /Users/YOU/path/to/medium-mcp/.venv/bin/medium-mcp
-```
-
-Start a new Claude Code session, approve the server when asked, and type `/mcp`
-to confirm `medium` is connected.
+Without uv: `pip install medium-writer-mcp` and use `medium-writer-mcp` as the command.
 
 ### Choosing the browser
 
@@ -84,7 +74,7 @@ a default with an environment variable (any app name from /Applications, or `def
 for your system browser):
 
 ```bash
-claude mcp add --scope user medium -e MEDIUM_BROWSER="Google Chrome" -- /Users/YOU/path/to/medium-mcp/.venv/bin/medium-mcp
+claude mcp add --scope user medium -e MEDIUM_BROWSER="Google Chrome" -- uvx medium-writer-mcp
 ```
 
 ## Try it
@@ -94,6 +84,22 @@ claude mcp add --scope user medium -e MEDIUM_BROWSER="Google Chrome" -- /Users/Y
 - "/mcp__medium__draft_from_code the caching layer in src/cache"
 - "Run prepare_article on docs/post.md and fix the warnings."
 - "Open docs/post.md in Medium."
+
+## Development
+
+```bash
+git clone https://github.com/MuhammadAsher/medium-mcp.git
+cd medium-mcp
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pytest            # 43 tests, all offline
+```
+
+To run your local copy in Claude Code, point the command at `.venv/bin/medium-mcp`.
+
+Releasing: bump `__version__` in `src/medium_mcp/__init__.py`, add a CHANGELOG entry,
+then push a matching tag (`git tag v0.2.1 && git push --tags`). GitHub Actions tests,
+builds and publishes to PyPI.
 
 ## Project layout
 
@@ -112,12 +118,6 @@ tests/           Offline tests with a fixture feed
 Dependencies: the `mcp` SDK (v2) and `truststore` (so HTTPS works with python.org
 builds on macOS). HTTP, XML and Markdown use the standard library.
 
-## Next steps
-
-- Wrap this in a Claude Code plugin: bundle the server with `/medium-draft` and
-  `/medium-publish` commands and a writing-style skill.
-- Add a `cross_post` tool that sets `canonical_url` from your own blog's URL.
-
 ## Legacy: direct publishing with an old token
 
 Only if you have an integration token created before January 2025. Setting one adds
@@ -126,7 +126,8 @@ Only if you have an integration token created before January 2025. Setting one a
 
 ```json
 "medium": {
-  "command": "/Users/YOU/path/to/medium-mcp/.venv/bin/medium-mcp",
+  "command": "uvx",
+  "args": ["medium-writer-mcp"],
   "env": { "MEDIUM_INTEGRATION_TOKEN": "your-token" }
 }
 ```

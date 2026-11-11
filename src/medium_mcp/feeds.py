@@ -13,10 +13,10 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 
-from . import _http
+from . import __version__, _http
 
 FEED_BASE = "https://medium.com/feed"
-USER_AGENT = "medium-mcp/0.1 (+https://github.com/modelcontextprotocol)"
+USER_AGENT = f"medium-writer-mcp/{__version__} (+https://github.com/MuhammadAsher/medium-mcp)"
 TIMEOUT_SECONDS = 15
 
 # Namespaces used in Medium's RSS

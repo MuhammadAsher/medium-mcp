@@ -23,7 +23,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import export, feeds, handoff
+from . import __version__, export, feeds, handoff
 from .formatter import prepare_article as _prepare_article
 from .medium_api import LICENSES, MediumAPIError, MediumClient
 
@@ -52,7 +52,7 @@ unless the user explicitly asked for that in this conversation. Medium's API
 cannot edit or delete a post after it is created.
 """
 
-mcp = MCPServer("medium", instructions=INSTRUCTIONS, version="0.2.0")
+mcp = MCPServer("medium", instructions=INSTRUCTIONS, version=__version__)
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHint=True)
 LOCAL_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False, idempotentHint=True)
