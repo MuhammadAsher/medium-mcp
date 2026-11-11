@@ -31,7 +31,7 @@ Note[^1].
 def test_title_from_first_h1_and_kept_once():
     r = prepare_article(SAMPLE, subtitle="What we measured", tags=["python"])
     assert r.title == "How We Cut API Latency by 70% With Three Small Changes"
-    assert r.content_markdown.startswith(f"# {r.title}\n## What we measured\n")
+    assert r.content_markdown.startswith(f"# {r.title}\n### What we measured\n")
     assert r.content_markdown.count(f"# {r.title}") == 1
 
 
@@ -58,7 +58,7 @@ def test_checklist_and_warnings():
     r = prepare_article(SAMPLE)
     assert "✅ done" in r.content_markdown and "⬜ todo" in r.content_markdown
     joined = " ".join(r.warnings)
-    for needle in ("nested", "alt text", "Footnotes", "subtitle", "No tags", "highlight"):
+    for needle in ("nested", "alt text", "Footnotes", "subtitle", "No tags"):
         assert needle in joined, needle
 
 
@@ -90,3 +90,11 @@ def test_footnote_and_html_checks_ignore_code_blocks():
 
 def test_footnote_in_prose_still_warns():
     assert any("Footnotes" in w for w in prepare_article("# T\n\nClaim[^1].\n").warnings)
+
+
+def test_only_long_code_blocks_warn():
+    short = prepare_article("# A title that is long enough to pass\n\n```\nx = 1\n```\n")
+    assert not any("Gist" in w for w in short.warnings)
+    body = "\n".join(f"line{i}" for i in range(40))
+    long = prepare_article(f"# A title that is long enough to pass\n\n```\n{body}\n```\n")
+    assert any("Gist" in w for w in long.warnings)

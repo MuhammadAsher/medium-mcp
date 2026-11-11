@@ -15,6 +15,7 @@ MAX_TAGS = 5
 MAX_TAG_LENGTH = 25
 MAX_TITLE_LENGTH = 100
 GOOD_TITLE_RANGE = (40, 70)  # what tends to display without truncation in feeds
+LONG_CODE_BLOCK_LINES = 30  # beyond this, suggest a Gist
 
 _FENCE_RE = re.compile(r"^(```|~~~)")
 _TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
@@ -76,7 +77,9 @@ def prepare_article(
     if title:
         body_start = [f"# {title}"]
         if subtitle:
-            body_start.append(f"## {subtitle}")
+            # "###" pastes as Medium's small heading, which it styles as the
+            # subtitle when it sits right under the title. "##" looks like a section.
+            body_start.append(f"### {subtitle}")
         lines = body_start + [""] + _strip_leading_blank(lines)
 
     # ---- Walk the body -------------------------------------------------------
@@ -89,7 +92,8 @@ def prepare_article(
     task_items = 0
     images_without_alt = 0
     extra_h1 = 0
-    code_blocks = 0
+    long_code_blocks = 0
+    fence_lines = 0
     prose: list[str] = []  # lines outside code blocks, for footnote/HTML checks
 
     def flush_table() -> None:
@@ -108,12 +112,14 @@ def prepare_article(
     for idx, line in enumerate(lines):
         if _FENCE_RE.match(line.strip()):
             flush_table()
-            if not in_fence:
-                code_blocks += 1
+            if in_fence and fence_lines > LONG_CODE_BLOCK_LINES:
+                long_code_blocks += 1
+            fence_lines = 0
             in_fence = not in_fence
             out.append(line)
             continue
         if in_fence:
+            fence_lines += 1
             out.append(line)
             continue
 
@@ -177,10 +183,11 @@ def prepare_article(
         warnings.append("Footnotes (`[^1]`) aren't supported on Medium; inline them or use a short 'Notes' section.")
     if _HTML_TAG_RE.search(prose_text):
         warnings.append("Raw HTML tags found; Medium ignores most HTML. Rewrite them as plain Markdown.")
-    if code_blocks:
+    if long_code_blocks:
         warnings.append(
-            f"{code_blocks} code block(s): Medium doesn't color-highlight code. "
-            "Long or important snippets read better as embedded GitHub Gists."
+            f"{long_code_blocks} code block(s) over {LONG_CODE_BLOCK_LINES} lines. Medium highlights "
+            "code itself, but long blocks are hard to read in an article; consider a GitHub Gist "
+            "or trimming to the lines that matter."
         )
 
     if title and len(title) > MAX_TITLE_LENGTH:

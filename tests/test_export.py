@@ -77,3 +77,11 @@ def test_export_tool_rejects_non_html_output(tmp_path):
         run(server.mcp.call_tool(
             "export_article", {"markdown": "# x\n\ny", "output_path": str(tmp_path / "out.md")}
         ))
+
+
+def test_apostrophes_curled_outside_code_and_tags():
+    out = markdown_to_html("Run `it's` and it's [Bob's](https://x.y/it's) page\n\n```\ndon't\n```\n")
+    assert "it\u2019s" in out and "Bob\u2019s" in out
+    assert "<code>it&#x27;s</code>" in out
+    assert 'href="https://x.y/it\'s"' in out
+    assert "don&#x27;t" in out

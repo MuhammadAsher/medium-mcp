@@ -192,7 +192,21 @@ def inline(text: str) -> str:
     text = re.sub(r"(?<![\w*])\*(?=\S)(.+?)(?<=\S)\*(?![\w*])", r"<em>\1</em>", text)
     text = re.sub(r"(?<![\w_])_(?=\S)(.+?)(?<=\S)_(?![\w_])", r"<em>\1</em>", text)
     text = re.sub(r"~~(?=\S)(.+?)(?<=\S)~~", r"<s>\1</s>", text)
+    text = _curl_apostrophes(text)
     return re.sub(r"\x00(\d+)\x00", lambda m: spans[int(m.group(1))], text)
+
+
+def _curl_apostrophes(text: str) -> str:
+    """Turn word-internal ' into ’ outside tags (code spans are already stashed).
+
+    Medium curls apostrophes on paste, but not reliably after an inline code
+    span, which leaves a mix of ' and ’ in one paragraph. Doing it here keeps
+    them consistent.
+    """
+    parts = re.split(r"(<[^>]*>)", text)
+    return "".join(
+        p if p.startswith("<") else re.sub(r"(?<=\w)'(?=\w)", "\u2019", p) for p in parts
+    )
 
 
 def _attr(value: str) -> str:
