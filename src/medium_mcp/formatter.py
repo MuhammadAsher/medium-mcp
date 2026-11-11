@@ -90,6 +90,7 @@ def prepare_article(
     images_without_alt = 0
     extra_h1 = 0
     code_blocks = 0
+    prose: list[str] = []  # lines outside code blocks, for footnote/HTML checks
 
     def flush_table() -> None:
         nonlocal tables_converted
@@ -120,6 +121,7 @@ def prepare_article(
             table_buf.append(line)
             continue
         flush_table()
+        prose.append(line)
 
         m = _HEADING_RE.match(line)
         if m:
@@ -170,9 +172,10 @@ def prepare_article(
         )
     if images_without_alt:
         warnings.append(f"{images_without_alt} image(s) have no alt text; add a short description for accessibility.")
-    if _FOOTNOTE_RE.search(markdown):
+    prose_text = "\n".join(prose)
+    if _FOOTNOTE_RE.search(prose_text):
         warnings.append("Footnotes (`[^1]`) aren't supported on Medium; inline them or use a short 'Notes' section.")
-    if _HTML_TAG_RE.search(markdown):
+    if _HTML_TAG_RE.search(prose_text):
         warnings.append("Raw HTML tags found; Medium ignores most HTML. Rewrite them as plain Markdown.")
     if code_blocks:
         warnings.append(

@@ -79,3 +79,14 @@ def test_missing_title_and_unclosed_fence():
 def test_reading_time():
     r = prepare_article("# T\n\n" + "word " * 530)
     assert r.word_count >= 530 and r.reading_minutes == 2
+
+
+def test_footnote_and_html_checks_ignore_code_blocks():
+    md = "# A title that is long enough to pass\n\n```python\nre.sub(r\"[^`]+\", x)\nhtml = \"<div>\"\n```\n"
+    warnings = prepare_article(md).warnings
+    assert not any("Footnotes" in w for w in warnings)
+    assert not any("Raw HTML" in w for w in warnings)
+
+
+def test_footnote_in_prose_still_warns():
+    assert any("Footnotes" in w for w in prepare_article("# T\n\nClaim[^1].\n").warnings)
